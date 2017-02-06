@@ -1,49 +1,83 @@
+# -*- encoding: utf-8 -*-
 #!/usr/bin/python
 import paramiko
-import os, sys
+import sys
 
-# Variavel passada na chamado so script
-host=sys.argv[1]
 
-ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+class ConexaoSSH(object):
 
-# Conecta ao servidor
-ssh.connect(host, username='USUARIO', password='SENHA')
+    def __init__(self, host, usuario, senha):
+        self.host = host
+        self.usuario = usuario
+        self.senha = senha
 
-# Executa linha de comando
-stdin, stdout, stderr = ssh.exec_command('/interface wireless registration-table print stats without-paging')
+    def conectar(self):
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-# Pega resultado da linha
-string = stdout.readlines()
+        try:
+            # Conecta ao servidor
+            ssh.connect(self.host, username=self.usuario, password=self.senha)
+            return ssh
 
-# Trata string para obter os resultados de CCQ, tx e rx
-string=str(string)
-tx = string.find('tx-ccq')
-rx = string.find('rx-ccq')
+        except ValueError:
+            return "Problemas com a conexão"
 
-tx=string[tx+7:tx+10]
-rx=string[rx+7:rx+10]
+    def executarComando(self, comando):
 
-if tx[2] == '%':
-    tx = tx[0:2]
+        ssh = self.conectar()
 
-if rx[2] == '%':
-    rx = rx[0:2]
+        # Executa linha de comando
+        stdin, stdout, stderr = ssh.exec_command(comando)
+        resultado = stdout.readlines()
+        ssh.close()
 
-# Fecha conexao com servidor
-ssh.close()
+        return resultado
 
-# Devolve resultado ao nagios
-if (int(tx) >= 90) and (int(rx)>= 90):
-    print "OK - Qualidade de CCQ = %s/%s" % (tx, rx)
-    sys.exit(0)
-elif (int(tx) >= 80) and (int(tx) < 90) or (int(rx) >= 80) and (int(rx) < 90):
-    print "WARNING - Qualidade de CCQ = %s/%s" % (tx, rx)
-    sys.exit(1)
-elif (int(tx) < 80) or (int(rx) < 80):
-    print "CRITICAL - Qualidade de CCQ = %s/%s" % (tx, rx)
-    sys.exit(2)
-else:
-    print "UKNOWN - Dados indisponiveis"
-    sys.exit(3)
+if __name__ == '__main__':
+    # Variaveis passadas na chamado do script
+    host = sys.argv[1]
+    usuario = sys.argv[2]
+    senha = sys.argv[3]
+    critical = sys.argv[4]
+    warning = sys.argv[5]
+
+    # Inicia objeto da classe
+    ssh = ConexaoSSH(host, usuario, senha)
+    # Pega resultado da linha
+    string = ssh.executarComando('/interface wireless registration-table print stats without-paging')
+
+    # Trata string para obter os resultados de CCQ, tx e rx
+    string = str(string)
+    if string:
+        tx = string.find('tx-ccq')
+        rx = string.find('rx-ccq')
+
+        tx=string[tx+7:tx+10]
+        rx=string[rx+7:rx+10]
+
+        if tx[2] == '%':
+            tx = tx[0:2]
+
+        if rx[2] == '%':
+            rx = rx[0:2]
+
+    else:
+        print "UKNOWN - Dados indisponiveis"
+        sys.exit(3)
+
+
+    # Devolve resultado ao nagios
+    if (int(tx) >= int(warning)) and (int(rx)>= int(warning)):
+        print "OK - Qualidade de CCQ = %s/%s" % (tx, rx)
+        sys.exit(0)
+    elif (int(tx) >= int(critical)) and (int(tx) < int(warning)) or \
+         (int(rx) >= int(critical)) and (int(rx) < int(warning)):
+        print "WARNING - Qualidade de CCQ = %s/%s" % (tx, rx)
+        sys.exit(1)
+    elif (int(tx) < int(critical)) or (int(rx) < int(critical)):
+        print "CRITICAL - Qualidade de CCQ = %s/%s" % (tx, rx)
+        sys.exit(2)
+    else:
+        print "UKNOWN - Dados indisponiveis"
+        sys.exit(3)
