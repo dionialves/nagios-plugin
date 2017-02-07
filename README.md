@@ -3,7 +3,7 @@
 PLugin para nagios, com o objetivo de retornar qualidade de conexão (TX e RX) de um enlace utilizando equipamentos mikrotik.
 
 ## Requisitos
-- python 2.7
+- python 3
 - paramiko
 - Nagios 
 - RouterOS v6.37 (Implementada nessa versão, pode funcionar em outras)
