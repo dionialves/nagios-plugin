@@ -4,14 +4,16 @@ import paramiko
 import re
 import json
 import sys
+from optparse import OptionParser
 
 
 class ConnectionSSH(object):
 
-    def __init__(self, host, user, password):
+    def __init__(self, host, user, password, port):
         self.host = host
         self.user = user
         self.password = password
+        self.port = port
 
     def connection(self):
         connect = paramiko.SSHClient()
@@ -19,11 +21,11 @@ class ConnectionSSH(object):
 
         try:
             # Connect to server
-            connect.connect(self.host, username=self.user, password=self.password)
+            connect.connect(hostname=self.host, port=self.port, username=self.user, password=self.password)
             return connect
 
         except:
-            print("UKNOWN - Authentication failed")
+            print("UKNOWN - Authentication failed or inaccessible host")
             sys.exit(3)
 
     def execute_command(self, command):
@@ -40,17 +42,41 @@ class ConnectionSSH(object):
 if __name__ == '__main__':
 
     # Variables received via the command line
-    argv_host = sys.argv[1]
-    argv_user = sys.argv[2]
-    argv_password = sys.argv[3]
-    argv_critical = sys.argv[4]
-    argv_warning = sys.argv[5]
+    parser = OptionParser()
+    parser.add_option("-H", "--host", dest="argv_host", type="string", help="Specify hostname to run")
+    parser.add_option("-u", "--user", dest="argv_user", type="string", help="Specify username for connect")
+    parser.add_option("-p", "--pass", dest="argv_password", type="string", help="Specify password for connect")
+    parser.add_option("-c", "--critical", dest="argv_critical", type="string", help="Specify the value of critical")
+    parser.add_option("-w", "--warning", dest="argv_warning", type="string", help="Specify the value of critical")
+    parser.add_option("-P",
+                      "--port",
+                      dest="argv_port",
+                      default="22",
+                      type="int",
+                      help="Specify the SSH connection port. If not specified we will use the default port 22")
+
+    # Receive as variables in command line
+    (options, args) = parser.parse_args()
+
+    argv_host = options.argv_host
+    argv_user = options.argv_user
+    argv_password = options.argv_password
+    argv_critical = options.argv_critical
+    argv_warning = options.argv_warning
+    argv_port = options.argv_port
+
+    # Checks whether the required variables have been entered
+    for option in ('argv_host', 'argv_user', 'argv_password', 'argv_critical', 'argv_warning'):
+        if not getattr(options, option):
+            print('UKNOWN - Option %s not specified' % option.capitalize())
+            sys.exit(3)
 
     # Start the class object
-    conn = ConnectionSSH(argv_host, argv_user, argv_password)
+    conn = ConnectionSSH(argv_host, argv_user, argv_password, argv_port)
 
     # Get result line
-    result_list = str(conn.execute_command('/interface wireless registration-table print stats without-paging')).split(" ")
+    result_list = str(conn.execute_command('/interface wireless registration-table '
+                                           'print stats without-paging')).split(" ")
 
     # In the code below, we extract the values ​​of tx and rx and put them in a dictionary.
     try:
